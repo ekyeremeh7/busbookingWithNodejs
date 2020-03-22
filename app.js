@@ -4,12 +4,21 @@ const ejs = require('ejs');
 const mongoose = require('mongoose');
 const _ = require("lodash");
 const bcrypt = require("mongoose-bcrypt");
-var uniqid = require("uniqid");
+const Bcrypt = require("bcryptjs");
+const https = require('https');
+const fs = require('fs');
+const key = fs.readFileSync('./localhost-key.pem');
+const cert = fs.readFileSync('./localhost.pem');
+const { auth } = require("express-openid-connect");
 
 let global_name = "";
 let global_signup_name = "";
 
 const app = express();
+
+// https.createServer({ key, cert }, app).listen('6000', () => {
+//     console.log('Listening on https://localhost:6000');
+// });
 
 app.set('view engine', 'ejs');
 
@@ -37,6 +46,28 @@ const userInfoSchema = new mongoose.Schema({
     })
     //compile our model
 const UserInfo = mongoose.model("UserInfo", userInfoSchema);
+
+
+//User authentication code
+
+// const config = {
+//     required: false,
+//     auth0Logout: true,
+//     baseURL: "https://localhost:6000",
+//     issuerBaseURL: "https://dev-8c9qxw-t.auth0.com",
+//     clientID: "eEWi27XtTHbv5gawm7Bu6EqRMd0gMdOf",
+//     appSessionSecret: "a long, randomly-generated string stored in env"
+// };
+
+// auth router attaches /login, /logout, and /callback routes to the baseURL
+// app.use(auth(config));
+
+// req.isAuthenticated is provided from the auth router
+// app.get("/", (req, res) => {
+//     res.send(req.isAuthenticated() ? "Logged in" : "Logged out");
+// });
+
+
 
 //creating admin user
 // const admin = new UserInfo({
@@ -145,25 +176,82 @@ const Bus = new mongoose.model("bus", busSchema);
 
 
 
+
 app.get("/", function(req, res) {
+    //res.send(req.isAuthenticated() ? "Logged in" : "Logged out");
     res.render("login");
 
 });
 
-app.post("/", function(req, res) {
+app.post("/", async(req, res) => {
     const username = req.body.username;
     global_name = username;
     const userPassword = req.body.password;
-    let data = UserInfo.findOne({ userName: username, password: userPassword }, function(err, userInfo) {});
+    try {
+        var user = await UserInfo.findOne({ userName: username }).exec();
+        if (!user || !Bcrypt.compareSync(userPassword, user.password)) {
+            res.render("sign_up");
+            // return res.status(400).send({ message: "Either The username does not exist or The password is incorrect" });
+        } else {
+            res.render("home", {
+                username: username
+            });
+        }
+        // if () {
+        //    // return res.status(400).send({ message: "The password is invalid" });
+        // }
+        // res.send({ message: "The username and password combination is correct!" });
 
-    if (data) {
-        res.render("home", {
-            username: username
-        });
-    } else if (userName !== username || password !== userPassword) {
-        res.render("sign_up");
+
+
+    } catch (error) {
+        res.status(500).send(error);
     }
 });
+// app.post("/", function(req, res) {
+//     const username = req.body.username;
+//     global_name = username;
+//     const userPassword = req.body.password;
+
+// try {
+//     var user = await UserInfo.findOne({ userName: username }).exec();
+//     if (!user) {
+//         return response.status(400).send({ message: "The username does not exist" });
+//     }
+//     if (!Bcrypt.compareSync(userPassword, user.password)) {
+//         return response.status(400).send({ message: "The password is invalid" });
+//     }
+//     response.send({ message: "The username and password combination is correct!" });
+// } catch (error) {
+//     response.status(500).send(error);
+//}
+// UserInfo.exists({ userName: username, password: userPassword }, function(err, userInfo) {
+//     let result = userInfo;
+//     // console.log(result);
+
+//     if (result === true) {
+//         res.render("home", {
+//             username: username
+//         });
+//     } else {
+//         res.render("sign_up");
+//     }
+// });
+
+
+// let data = UserInfo.findOne({ userName: username, password: userPassword }, function(err, userInfo) {});
+
+// if (data) {
+//     res.render("home", {
+//         username: username
+//     });
+
+// } else {
+
+//     res.render("sign_up");
+// }
+
+// });
 
 
 app.get("/signup_form", function(req, res) {
@@ -176,7 +264,8 @@ app.post("/home", function(req, res) {
     const prefix = req.body.prefix;
     const number = req.body.number;
     const phoneNumber = prefix + number;
-    const userPassword = req.body.userPassword;
+    const userPassword = Bcrypt.hashSync(req.body.userPassword, 10);
+    //console.log(userPassword);
     global_signup_name = signUpUsername;
 
 
@@ -203,16 +292,16 @@ app.get("/home", function(req, res) {
 
 
     const username = global_name;
-    const sigup_username = global_signup_name;
+    const signup_username = global_signup_name;
 
     let noOfDocuments = UserInfo.countDocuments({}, function(err, count) {
         // console.log("There are %d documents ", count)
     });
 
 
-    if (sigup_username) {
+    if (signup_username) {
         res.render("home", {
-            username: sigup_username,
+            username: signup_username,
             // customers: noOfDocuments,
         })
     } else if (username) {
