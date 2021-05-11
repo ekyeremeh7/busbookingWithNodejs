@@ -18,7 +18,7 @@
     "express-openid-connect": "^0.6.0",
     "fs": "0.0.1-security",
     "https": "^1.0.0",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.21",
     "mongodb": "^3.5.4",
     "mongoose": "^5.9.3",
     "mongoose-bcrypt": "^1.6.0",
